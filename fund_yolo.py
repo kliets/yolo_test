@@ -3,46 +3,59 @@ from ultralytics import YOLO
 from PIL import Image
 import numpy as np
 
-st.set_page_config(page_title="YOLO Objekterkennung")
-st.title("🔍 YOLOv8 Objekterkennung")
-st.write("Lade ein Bild hoch und die KI erkennt Objekte automatisch mit dem vortrainierten YOLO-Modell.")
+st.set_page_config(page_title="YOLO Fundbüro", layout="wide")
 
-# 1. Modell laden (vortrainiert auf 80 Alltags-Kategorien)
-# 'yolov8n.pt' wird beim ersten Mal automatisch heruntergeladen
+# 1. YOLO MODELL LADEN (Kein TensorFlow nötig -> Fehler gelöst!)
 @st.cache_resource
-def load_yolo_model():
-    return YOLO('yolov8n.pt') 
+def load_yolo():
+    # Lädt das kleine, schnelle Modell (wird bei Bedarf geladen)
+    return YOLO('yolov8n.pt')
 
-model = load_yolo_model()
+model = load_yolo()
 
-# 2. Upload
-uploaded_file = st.file_uploader("Bild auswählen...", type=["jpg", "jpeg", "png"])
+st.title("🔍 KI Objekterkennung (YOLO)")
+
+# 2. DATEI UPLOAD
+uploaded_file = st.file_uploader("Bild hochladen...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
     # Bild öffnen
     image = Image.open(uploaded_file)
     
-    # Anzeige des Originalbildes
-    st.image(image, caption='Originalbild', use_column_width=True)
+    # Layout mit zwei Spalten: Links Original, Rechts KI-Ergebnis
+    col1, col2 = st.columns(2)
     
-    if st.button("Objekte erkennen"):
-        with st.spinner('KI arbeitet...'):
-            # 3. Vorhersage (Inference)
+    with col1:
+        st.subheader("Dein Foto")
+        st.image(image, use_column_width=True)
+
+    with col2:
+        st.subheader("KI Analyse")
+        with st.spinner('Analysiere...'):
+            # YOLO Vorhersage treffen
             results = model(image)
             
-            # 4. Ergebnisbild zeichnen (YOLO macht das automatisch mit .plot())
+            # Das Ergebnis-Bild mit den Boxen zeichnen
             res_plotted = results[0].plot()
             
-            # Konvertiere BGR (OpenCV Format) zu RGB (PIL Format)
+            # Von BGR zu RGB konvertieren (YOLO nutzt intern OpenCV Format)
             res_image = Image.fromarray(res_plotted[:, :, ::-1])
             
-            # Ergebnis anzeigen
-            st.image(res_image, caption='Erkanntes Ergebnis', use_column_width=True)
-            
-            # 5. Liste der erkannten Objekte ausgeben
-            st.subheader("Gefundene Objekte:")
-            for box in results[0].boxes:
-                class_id = int(box.cls[0])
-                label = model.names[class_id]
-                conf = float(box.conf[0])
-                st.write(f"- **{label}** (Sicherheit: {conf:.2%})")
+            st.image(res_image, use_column_width=True)
+
+    # 3. TEXT-AUSGABE DER ERGEBNISSE
+    st.divider()
+    st.subheader("Gefundene Objekte:")
+    
+    boxes = results[0].boxes
+    if len(boxes) == 0:
+        st.write("Keine Objekte erkannt.")
+    else:
+        for box in boxes:
+            class_id = int(box.cls[0])
+            label = model.names[class_id]
+            prob = float(box.conf[0])
+            st.success(f"Gefunden: **{label}** (Sicherheit: {prob:.2%})")
+
+else:
+    st.info("Bitte lade ein Bild hoch, um die Erkennung zu starten.")
