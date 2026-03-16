@@ -3,59 +3,45 @@ from ultralytics import YOLO
 from PIL import Image
 import numpy as np
 
-st.set_page_config(page_title="YOLO Fundbüro", layout="wide")
+# Verhindert, dass alte TensorFlow-Reste geladen werden
+st.cache_resource.clear()
 
-# 1. YOLO MODELL LADEN (Kein TensorFlow nötig -> Fehler gelöst!)
+st.title("🚀 YOLO Fundbüro Test")
+
+# 1. Modell laden (YOLOv8 Nano)
 @st.cache_resource
-def load_yolo():
-    # Lädt das kleine, schnelle Modell (wird bei Bedarf geladen)
+def get_model():
     return YOLO('yolov8n.pt')
 
-model = load_yolo()
+try:
+    model = get_model()
+    st.success("YOLO Modell erfolgreich geladen!")
+except Exception as e:
+    st.error(f"Modell-Fehler: {e}")
 
-st.title("🔍 KI Objekterkennung (YOLO)")
-
-# 2. DATEI UPLOAD
-uploaded_file = st.file_uploader("Bild hochladen...", type=["jpg", "jpeg", "png"])
+# 2. Upload
+uploaded_file = st.file_uploader("Bild hochladen", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    # Bild öffnen
+    # Bild sofort anzeigen (damit wir sehen, dass der Upload klappt)
     image = Image.open(uploaded_file)
+    st.image(image, caption="Hochgeladenes Bild", use_column_width=True)
     
-    # Layout mit zwei Spalten: Links Original, Rechts KI-Ergebnis
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Dein Foto")
-        st.image(image, use_column_width=True)
-
-    with col2:
-        st.subheader("KI Analyse")
-        with st.spinner('Analysiere...'):
-            # YOLO Vorhersage treffen
-            results = model(image)
-            
-            # Das Ergebnis-Bild mit den Boxen zeichnen
-            res_plotted = results[0].plot()
-            
-            # Von BGR zu RGB konvertieren (YOLO nutzt intern OpenCV Format)
-            res_image = Image.fromarray(res_plotted[:, :, ::-1])
-            
-            st.image(res_image, use_column_width=True)
-
-    # 3. TEXT-AUSGABE DER ERGEBNISSE
-    st.divider()
-    st.subheader("Gefundene Objekte:")
-    
-    boxes = results[0].boxes
-    if len(boxes) == 0:
-        st.write("Keine Objekte erkannt.")
-    else:
-        for box in boxes:
-            class_id = int(box.cls[0])
-            label = model.names[class_id]
-            prob = float(box.conf[0])
-            st.success(f"Gefunden: **{label}** (Sicherheit: {prob:.2%})")
-
-else:
-    st.info("Bitte lade ein Bild hoch, um die Erkennung zu starten.")
+    if st.button("KI Erkennung starten"):
+        # Vorhersage
+        results = model(image)
+        
+        # Ergebnis-Bild mit Boxen erstellen
+        res_plotted = results[0].plot()
+        # Konvertierung von BGR zu RGB
+        res_image = Image.fromarray(res_plotted[:, :, ::-1])
+        
+        # Ergebnis anzeigen
+        st.subheader("Ergebnis der KI:")
+        st.image(res_image, caption="Erkanntes Bild", use_column_width=True)
+        
+        # Liste der Objekte
+        for box in results[0].boxes:
+            label = model.names[int(box.cls[0])]
+            conf = float(box.conf[0])
+            st.write(f"✅ Gefunden: **{label}** ({conf:.2%})")
